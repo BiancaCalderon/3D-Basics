@@ -1,3 +1,10 @@
+mod player;
+mod cast_ray;
+mod events;
+
+use cast_ray::cast_ray;
+use player::Player;
+use events::process_events;
 use minifb::{Window, WindowOptions};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -54,7 +61,7 @@ fn generate_maze(width: usize, height: usize) -> Vec<Vec<char>> {
     maze
 }
 
-fn render(maze: &Vec<Vec<char>>, window: &mut Window) {
+fn render(maze: &Vec<Vec<char>>, window: &mut Window, player: &Player) {
     let width = window.get_size().0;
     let height = window.get_size().1;
     let cell_size = 20; // Tamaño de cada celda en píxeles
@@ -64,7 +71,7 @@ fn render(maze: &Vec<Vec<char>>, window: &mut Window) {
     for (y, row) in maze.iter().enumerate() {
         for (x, &cell) in row.iter().enumerate() {
             let color = match cell {
-                '+' | '|' => 0xFF0000, // Rojo para paredes
+                '+' | '|' => 0x4b0082, // Indigo para paredes
                 ' ' => 0xFFFFFF, // Blanco para espacio libre
                 'p' => 0x00FF00, // Verde para punto de inicio
                 'g' => 0x0000FF, // Azul para objetivo
@@ -84,6 +91,9 @@ fn render(maze: &Vec<Vec<char>>, window: &mut Window) {
         }
     }
 
+    // Render del rayo
+    cast_ray(&maze, player, &mut buffer, width, height, cell_size);
+
     window.update_with_buffer(&buffer, width, height).unwrap();
 }
 
@@ -98,20 +108,23 @@ fn save_maze_to_file(maze: &Vec<Vec<char>>, filename: &str) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     
-    let width = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(16);
-    let height = args.get(3).and_then(|s| s.parse::<usize>().ok()).unwrap_or(8);
+    let width = args.get(1).and_then(|s| s.parse::<usize>().ok()).unwrap_or(16);
+    let height = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(8);
 
     let maze = generate_maze(width, height);
     let cell_size = 20;
-    let window_width = width * 2 * cell_size + cell_size; // Ajusta el tamaño de la ventana
-    let window_height = height * 2 * cell_size + cell_size;
+    let window_width = (width * 2 + 1) * cell_size; // Ajuste el tamaño de la ventana según el laberinto
+    let window_height = (height * 2 + 1) * cell_size; // Ajuste el tamaño de la ventana según el laberinto
     let mut window = Window::new("Maze Renderer", window_width, window_height, WindowOptions::default()).unwrap();
+
+    // Crear el jugador en la posición inicial (donde 'p' se encuentra)
+    let mut player = Player::new(1.5 * cell_size as f32, 0.5 * cell_size as f32, std::f32::consts::PI / 3.0);
 
     // Guardar el laberinto en el archivo al iniciar
     save_maze_to_file(&maze, "maze.txt");
 
     while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
-        render(&maze, &mut window);
+        process_events(&window, &mut player); // Procesar los eventos de entrada
+        render(&maze, &mut window, &player);
     }
 }
-
